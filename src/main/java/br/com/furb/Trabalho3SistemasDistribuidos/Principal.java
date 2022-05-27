@@ -17,6 +17,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
 
+import javax.jms.JMSException;
+
 public class Principal {
 
 	private static Scanner scan = new Scanner(System.in);
@@ -25,7 +27,7 @@ public class Principal {
 		return scan;
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws JMSException {
 		criaProdutos();
 	}
 
@@ -59,7 +61,6 @@ public class Principal {
 					System.out.println(AzureController.criarJSONdeHashMap(valores));
 					mensagens.add(AzureController.criarMensagemJSON(jsonMensagem));
 				}
-				AzureController.enviarMensagens(mensagens);
 			}
 		} catch (Exception e) {
 			// Em caso de erro na insercao de algum dos produtos, e gerado uma mensagem para
@@ -69,5 +70,6 @@ public class Principal {
 			erro.put("Erro", "Erro na digitação do produto: " + e.toString());
 			AzureController.enviarMensagem(AzureController.criarJSONdeHashMap(erro));
 		}
+		AzureController.enviarMensagens(mensagens);		
 	}
 }

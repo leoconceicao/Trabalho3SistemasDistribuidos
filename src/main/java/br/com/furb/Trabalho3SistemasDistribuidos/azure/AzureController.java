@@ -11,6 +11,10 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import javax.swing.JOptionPane;
 
 public class AzureController {
 
@@ -56,9 +60,22 @@ public class AzureController {
 			senderClient.sendMessages(messageBatch);
 			System.out.println("Enviado uma lista de mensagens para a fila: " + getFila());
 		}
+	}
 
-		// Fechar a conexão com o Service Bus
-		senderClient.close();
+	public static void receiveMessages() throws InterruptedException {
+		CountDownLatch countdownLatch = new CountDownLatch(1);
+
+		// Create an instance of the processor through the ServiceBusClientBuilder
+		ServiceBusProcessorClient processorClient = new ServiceBusClientBuilder().connectionString(connectionString)
+				.processor().queueName(getFila()).processMessage(AzureController::processMessage)
+				.processError(context -> processError(context, countdownLatch)).buildProcessorClient();
+
+		System.out.println("Starting the processor");
+		processorClient.start();
+
+		TimeUnit.SECONDS.sleep(10);
+		System.out.println("Stopping and closing the processor");
+		//processorClient.close();
 	}
 
 	public static void enviarMensagem(String mensagem) {
@@ -69,9 +86,49 @@ public class AzureController {
 		// Enviar uma mensagem para a fila
 		senderClient.sendMessage(new ServiceBusMessage(mensagem));
 		System.out.println("Sent a single message to the queue: " + getFila());
+	}
 
-		// Fechar a conexão com o Service Bus
-		senderClient.close();
+	private static void processMessage(ServiceBusReceivedMessageContext contexto) {
+		
+		ServiceBusReceivedMessage mensagem = contexto.getMessage();
+		System.out.printf("Processing message. Session: %s, Sequence #: %s. Contents: %s%n", mensagem.getMessageId(),
+				mensagem.getSequenceNumber(), mensagem.getBody());
+		JOptionPane.showMessageDialog(null, String.format("Mensagem recebida do Azure! Sequência da Mensagem: %s. Conteúdo da Mensagem: %s",
+				mensagem.getSequenceNumber(), mensagem.getBody()));
+	}
+
+	private static void processError(ServiceBusErrorContext contexto, CountDownLatch countdownLatch) {
+		System.out.printf("Erro ao buscar informações da fila: '%s'. Entidade: '%s'%n",
+				contexto.getFullyQualifiedNamespace(), contexto.getEntityPath());
+
+		if (!(contexto.getException() instanceof ServiceBusException)) {
+			System.out.printf("Non-ServiceBusException occurred: %s%n", contexto.getException());
+			return;
+		}
+
+		ServiceBusException excecao = (ServiceBusException) contexto.getException();
+		ServiceBusFailureReason razao = excecao.getReason();
+
+		if (razao == ServiceBusFailureReason.MESSAGING_ENTITY_DISABLED
+				|| razao == ServiceBusFailureReason.MESSAGING_ENTITY_NOT_FOUND
+				|| razao == ServiceBusFailureReason.UNAUTHORIZED) {
+			System.out.printf("Um erro ocorreu na execução. Parando processo pelo motivo %s: %s%n", razao,
+					excecao.getMessage());
+
+			countdownLatch.countDown();
+		} else if (razao == ServiceBusFailureReason.MESSAGE_LOCK_LOST) {
+			System.out.printf("Lock de mensagem perdido pelo motivo: %s%n", contexto.getException());
+		} else if (razao == ServiceBusFailureReason.SERVICE_BUSY) {
+			try {
+				// Escolhe um valor arbitrário para aguardar e tentar novamente.
+				TimeUnit.SECONDS.sleep(1);
+			} catch (InterruptedException e) {
+				System.err.println("Não foi possível aguardar o período escolhido");
+			}
+		} else {
+			System.out.printf("Erro da fonte %s, motivo %s, mensagem: %s%n", contexto.getErrorSource(), razao,
+					contexto.getException());
+		}
 	}
 
 	// Metodo para formatacao do Hashmap para um JSON, para envio ao Azure e
