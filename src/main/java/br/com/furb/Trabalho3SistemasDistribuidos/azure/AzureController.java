@@ -18,8 +18,9 @@ import javax.swing.JOptionPane;
 
 public class AzureController {
 
+	// Código de string buscado na Fila de mensagens (Cadeia de Conexão Primária ou Secundária em Fila de Mensagens > Políticas de Acesso Compartilhado)
 	private static String connectionString = "Endpoint=sb://serverlecpocteste.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=tRr6QsJg+JBhUAmGyW8GMy8J7PNrPWmsYzcmA+troNY=";
-	private static String fila = "filapoctrabalho3";
+	private static String fila = "filapoctrabalho3"; // Fila criada no Azure
 
 	public static String getConnectionString() {
 		return connectionString;
@@ -30,10 +31,11 @@ public class AzureController {
 	}
 
 	public static void enviarMensagens(ArrayList<ServiceBusMessage> mensagens) {
-		// create a Service Bus Sender client for the queue
+		// Criar a conexão com o Service Bus para a fila
 		ServiceBusSenderClient senderClient = new ServiceBusClientBuilder().connectionString(getConnectionString())
 				.sender().queueName(getFila()).buildClient();
 
+		// Criar uma lista de mensagens
 		ServiceBusMessageBatch messageBatch = senderClient.createMessageBatch();
 
 		for (ServiceBusMessage message : mensagens) {
@@ -65,17 +67,13 @@ public class AzureController {
 	public static void receiveMessages() throws InterruptedException {
 		CountDownLatch countdownLatch = new CountDownLatch(1);
 
-		// Create an instance of the processor through the ServiceBusClientBuilder
+		// Criar uma instância de processador pelo cliente do Service Bus
 		ServiceBusProcessorClient processorClient = new ServiceBusClientBuilder().connectionString(connectionString)
 				.processor().queueName(getFila()).processMessage(AzureController::processMessage)
 				.processError(context -> processError(context, countdownLatch)).buildProcessorClient();
 
-		System.out.println("Starting the processor");
+		System.out.println("Iniciando o processador");
 		processorClient.start();
-
-		TimeUnit.SECONDS.sleep(10);
-		System.out.println("Stopping and closing the processor");
-		//processorClient.close();
 	}
 
 	public static void enviarMensagem(String mensagem) {
@@ -85,13 +83,13 @@ public class AzureController {
 
 		// Enviar uma mensagem para a fila
 		senderClient.sendMessage(new ServiceBusMessage(mensagem));
-		System.out.println("Sent a single message to the queue: " + getFila());
+		System.out.println("Enviado uma única mensagem para a fila: " + getFila());
 	}
 
 	private static void processMessage(ServiceBusReceivedMessageContext contexto) {
 		
 		ServiceBusReceivedMessage mensagem = contexto.getMessage();
-		System.out.printf("Processing message. Session: %s, Sequence #: %s. Contents: %s%n", mensagem.getMessageId(),
+		System.out.printf("Processada mensagem. Sessão: %s, Sequência #: %s. Conteúdo da mensagem: %s%n", mensagem.getMessageId(),
 				mensagem.getSequenceNumber(), mensagem.getBody());
 		JOptionPane.showMessageDialog(null, String.format("Mensagem recebida do Azure! Sequência da Mensagem: %s. Conteúdo da Mensagem: %s",
 				mensagem.getSequenceNumber(), mensagem.getBody()));
