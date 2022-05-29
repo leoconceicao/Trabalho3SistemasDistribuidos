@@ -35,7 +35,7 @@ public class AzureController {
 		ServiceBusSenderClient senderClient = new ServiceBusClientBuilder().connectionString(getConnectionString())
 				.sender().queueName(getFila()).buildClient();
 
-		// Criar uma lista de mensagens
+		// Criar um pacote de mensagens
 		ServiceBusMessageBatch messageBatch = senderClient.createMessageBatch();
 
 		for (ServiceBusMessage message : mensagens) {
